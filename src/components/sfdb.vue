@@ -38,6 +38,7 @@
     <a-modal v-model:open="cfgModalOpen" title="数据项配置">
         <template #footer>
             <a-button key="back" @click="cfgModalCancel">取消</a-button>
+            <a-button danger @click="cfgModalClear">清空配置</a-button>
             <a-button key="submit" type="primary" :loading="cfgModalLoading" @click="cfgModalOk">确认</a-button>
         </template>
         <a-tabs v-model:activeKey="activeKey" type="editable-card" @edit="onTabEdit">
@@ -141,16 +142,23 @@ const cfgModalOk = () => {
             message.success('配置已保存')
             if (!sfdbTableMake()) {
                 message.error('数据解析异常')
-                sfdb.records.length = 0
             }
             cfgModalLoading.value = false;
             cfgModalOpen.value = false;
+
+            sfdb.valid = false
+            sfdb.records.length = 0
+            tableData.length = 0
         }
     }, 300);
 }
 
 const cfgModalCancel = () => {
     cfgModalOpen.value = false;
+}
+
+const cfgModalClear = () => {
+    sfdbRecordCfg.length = 0
 }
 
 //TAB
@@ -177,7 +185,7 @@ const sfdb: SfdbType = reactive({
 const tableColumns: TableColumnType[] = reactive([])
 const sortedInfo = ref()
 const tablePageCfg = reactive({
-    defaultPageSize:20,
+    defaultPageSize: 20,
     total: sfdb.head.recordCnt,
     showTotal: (total: number) => `总${total}条`
 })
