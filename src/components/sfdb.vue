@@ -286,6 +286,7 @@ const sdb_head_decode = (headBuffer: ArrayBuffer): boolean => {
 
 const sdb_record_list_decode = (recordBuffer: ArrayBuffer): boolean => {
     //根据 recordCnt 和 recordIdx 从新到旧的顺序，将记录存入 records 数组
+    sfdb.records.length = 0
     let _idx = sfdb.head.recordIdx
     for (let i = 0; i < sfdb.head.recordCnt; i++) {
         let record: ArrayBuffer = recordBuffer.slice(_idx * sfdb.head.recordSize, (_idx + 1) * sfdb.head.recordSize)
