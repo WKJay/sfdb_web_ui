@@ -18,7 +18,42 @@
 
         <a-card>
             <a-table :columns="tableColumns" :data-source="tableData" :pagination="tablePageCfg" size="small"
-                :scroll="{ x: 'max-content' }" @change="sfdbTableChange" bordered></a-table>
+                :scroll="{ x: 'max-content' }" @change="sfdbTableChange" bordered>
+                <template #customFilterDropdown="{ setSelectedKeys, selectedKeys, confirm, clearFilters, column }">
+                    <div style="padding: 8px">
+                        <a-input ref="searchInput" :placeholder="`查找`" :value="selectedKeys[0]"
+                            style="width: 188px; margin-bottom: 8px; display: block"
+                            @change="(e: any) => setSelectedKeys(e.target.value ? [e.target.value] : [])"
+                            @pressEnter="handleSearch(selectedKeys, confirm, column.dataIndex)" />
+                        <a-button type="primary" size="small" style="width: 90px; margin-right: 8px"
+                            @click="handleSearch(selectedKeys, confirm, column.dataIndex)">
+                            <template #icon>
+                                <SearchOutlined />
+                            </template>
+                            Search
+                        </a-button>
+                        <a-button size="small" style="width: 90px" @click="handleReset(clearFilters)">
+                            Reset
+                        </a-button>
+                    </div>
+                </template>
+                <template #customFilterIcon="{ filtered }">
+                    <search-outlined :style="{ color: filtered ? '#108ee9' : undefined }" />
+                </template>
+                <template #bodyCell="{ text, column }">
+                    <span v-if="state.searchText && state.searchedColumn === column.dataIndex">
+                        <template v-for="(fragment, i) in text
+                            .toString()
+                            .split(new RegExp(`(?<=${state.searchText})|(?=${state.searchText})`, 'i'))">
+                            <mark v-if="fragment.toLowerCase() === state.searchText.toLowerCase()" :key="i"
+                                class="highlight">
+                                {{ fragment }}
+                            </mark>
+                            <template v-else>{{ fragment }}</template>
+                        </template>
+                    </span>
+                </template>
+            </a-table>
         </a-card>
     </div>
 
@@ -83,9 +118,10 @@
 
 <script setup lang="ts">
 import { h, onMounted, reactive, ref } from 'vue'
-import { AppstoreOutlined, SettingOutlined } from '@ant-design/icons-vue'
+import { AppstoreOutlined, SettingOutlined, SearchOutlined } from '@ant-design/icons-vue'
 import { message } from 'ant-design-vue';
 import type { UploadProps, TableProps, TableColumnType, MenuProps } from 'ant-design-vue';
+import type { FilterConfirmProps, Key, } from 'ant-design-vue/lib/table/interface'
 import {
     SfdbType, SfdbRecordType, SfdbValueFormat, SfdbDisplayFormat,
     sfdbDataDecode, sfdbDataLenGetByValueFormat, sfdbDispFormatShow, sfdbLittleEndianShow
@@ -299,6 +335,7 @@ const sdb_record_list_decode = (recordBuffer: ArrayBuffer): boolean => {
     return true
 }
 
+//TABLE 
 const sfdbTableColumnMake = (): boolean => {
     tableColumns.length = 0
     const sorted = sortedInfo.value || {};
@@ -318,7 +355,7 @@ const sfdbTableColumnMake = (): boolean => {
             dataIndex: cfg.key,
             key: cfg.key
         }
-        if (cfg.displayFormat == SfdbDisplayFormat.DEC || cfg.displayFormat == SfdbDisplayFormat.HEX || cfg.displayFormat == SfdbDisplayFormat.BIN) {
+        if (sfdbDispFormatShow(cfg.valueFormat)) {
             column.sorter = (a, b) => {
                 let radix: number = 10
                 switch (cfg.displayFormat) {
@@ -340,6 +377,16 @@ const sfdbTableColumnMake = (): boolean => {
                 return aNum - bNum
             }
             column.sortOrder = sorted.columnKey === cfg.key && sorted.order
+        } else if (cfg.valueFormat == 'string') {
+            column.customFilterDropdown = true
+            column.onFilter = (value, record) => record[cfg.key].toString().toLowerCase().includes((value as string).toLowerCase())
+            column.onFilterDropdownOpenChange = visible => {
+                if (visible) {
+                    setTimeout(() => {
+                        searchInput.value.focus();
+                    }, 100);
+                }
+            }
         }
 
         if (cfg.valueFormat == SfdbValueFormat.DATE6 || cfg.valueFormat == SfdbValueFormat.UNIXTIME) {
@@ -369,6 +416,23 @@ const sfdbTableChange: TableProps['onChange'] = (pagination, filters, sorter: an
     });
 
 }
+
+//TABLE SEARCH
+const state = reactive({
+    searchText: '',
+    searchedColumn: '',
+});
+const searchInput = ref();
+const handleSearch = (selectedKeys: Key[], confirm: (param?: FilterConfirmProps) => void, dataIndex: string) => {
+    confirm();
+    state.searchText = selectedKeys[0] as string;
+    state.searchedColumn = dataIndex;
+};
+
+const handleReset = (clearFilters: (obj: any) => void) => {
+    clearFilters({ confirm: true });
+    state.searchText = '';
+};
 
 const sfdbRecordDataDecode = (record: ArrayBuffer): boolean => {
     for (let i = 0; i < sfdbRecordCfg.length; i++) {
